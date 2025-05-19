@@ -9,7 +9,7 @@ type NameSize = u8;
 type Id = Count;
 
 pub struct FileSystem {
-    header: Header
+    header: Header,
 }
 
 struct Dir {
@@ -22,14 +22,14 @@ struct Dir {
 struct ClusterLoc {
     cluster: Id,
     offset: Size,
-    chunk_size: Size
+    chunk_size: Size,
 }
 
 struct File {
     id: Id,
     name: String,
     size: Size,
-    clusters: Vec<ClusterLoc>
+    clusters: Vec<ClusterLoc>,
 }
 
 pub struct Header {
@@ -52,7 +52,7 @@ impl Header {
 
         let dirs_size = Header::read_u16(data_slice)? as usize;
         data_slice = &data_slice[2..];
-        
+
         let dirs = Vec::new();
         for i in 0..dirs_size {
             todo!()
