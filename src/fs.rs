@@ -1,5 +1,5 @@
+use super::serialization::{read_num, read_string};
 use std::io;
-use std::io::Read;
 use std::path::Path;
 
 type Version = u32;
@@ -40,45 +40,79 @@ pub struct Header {
 }
 
 impl Header {
-    pub fn load(file_name: &Path) -> Result<Header, io::Error> {
+    pub fn load(file_name: &Path) -> io::Result<Header> {
         let data = std::fs::read(file_name)?;
         let mut data_slice = data.as_slice();
 
-        let fs_version = Header::read_u32(data_slice)?;
-        data_slice = &data_slice[4..];
+        let fs_version = read_num::<Version>(&mut data_slice)?;
+        let cluster_size = read_num::<Size>(&mut data_slice)?;
 
-        let cluster_size = Header::read_u64(data_slice)?;
-        data_slice = &data_slice[8..];
+        let dirs_count = read_num::<Count>(&mut data_slice)? as usize;
+        let mut dirs = Vec::with_capacity(dirs_count);
+        for i in 0..dirs_count {
+            let id = read_num::<Id>(&mut data_slice)?;
+            let name = read_string(&mut data_slice)?;
 
-        let dirs_size = Header::read_u16(data_slice)? as usize;
-        data_slice = &data_slice[2..];
+            let subdirs_count = read_num::<Count>(&mut data_slice)? as usize;
+            let mut subdirs = Vec::with_capacity(subdirs_count);
+            for i in 0..subdirs_count {
+                let subdir_id = read_num::<Id>(&mut data_slice)?;
+                subdirs.push(subdir_id);
+            }
 
-        let dirs = Vec::new();
-        for i in 0..dirs_size {
-            todo!()
+            let files_count = read_num::<Count>(&mut data_slice)? as usize;
+            let mut files = Vec::with_capacity(files_count);
+            for i in 0..files_count {
+                let file_id = read_num::<Id>(&mut data_slice)?;
+                files.push(file_id);
+            }
+
+            dirs.push(Dir {
+                id,
+                name,
+                subdirs,
+                files,
+            });
+        }
+
+        let files_count = read_num::<Count>(&mut data_slice)? as usize;
+        let mut files = Vec::with_capacity(files_count);
+        for i in 0..files_count {
+            let id = read_num::<Id>(&mut data_slice)?;
+            let name = read_string(&mut data_slice)?;
+            let size = read_num::<Size>(&mut data_slice)?;
+
+            let clusters_count = read_num::<Count>(&mut data_slice)? as usize;
+            let mut clusters = Vec::with_capacity(clusters_count);
+            for i in 0..clusters_count {
+                let cluster = read_num::<Id>(&mut data_slice)?;
+                let offset = read_num::<Size>(&mut data_slice)?;
+                let chunk_size = read_num::<Size>(&mut data_slice)?;
+
+                clusters.push(ClusterLoc {
+                    cluster,
+                    offset,
+                    chunk_size,
+                });
+            }
+
+            files.push(File {
+                id,
+                name,
+                size,
+                clusters,
+            });
         }
 
         Ok(Header {
             fs_version,
             cluster_size,
             dirs,
-            files: vec![],
+            files,
         })
     }
 
     pub fn save(header: &Header, file_name: &Path) {
         unimplemented!();
-    }
-
-    fn read_u16(data: &[u8]) -> io::Result<u16> {
-        Ok(u16::from_le_bytes(data[..2].try_into().unwrap()))
-    }
-
-    fn read_u32(data: &[u8]) -> io::Result<u32> {
-        Ok(u32::from_le_bytes(data[..4].try_into().unwrap()))
-    }
-
-    fn read_u64(data: &[u8]) -> io::Result<u64> {
-        Ok(u64::from_le_bytes(data[..8].try_into().unwrap()))
     }
 }
